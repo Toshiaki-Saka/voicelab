@@ -1,0 +1,24 @@
+# Build artifacts
+build/
+
+# Whisper model weights (large binary files)
+models/
+
+# ImGui session state
+imgui.ini
+
+# Log / stderr capture files
+/app_stderr.txt
+/autorun_stderr.txt
+/demo_err.txt
+/demo_stderr.txt
+/transcribe_stderr.txt
+
+# Generated audio / feature files
+/simulation_output/*.wav
+/simulation_output/*.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
