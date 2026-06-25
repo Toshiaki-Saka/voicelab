@@ -14,6 +14,12 @@ serve two audiences at once:
 - **Builders** who want a no-fuss real-time audio pipeline they can drop
   into a desktop or embedded application.
 
+> **Scope.** voicelab is a focused, *readable* implementation of the core
+> real-time audio DSP building blocks (~2.4k lines). It is **not** a replacement
+> for [librosa](https://librosa.org/), [Essentia](https://essentia.upf.edu/) or
+> [aubio](https://aubio.org/) and does not aim for feature completeness — its
+> value is in being small, dependency-light and easy to read line by line.
+
 ## Status
 
 Pre-1.0. Public headers may break. Bug reports and patches welcome.
@@ -55,6 +61,21 @@ cmake -S . -B build \
   -DVOICELAB_WITH_WHISPER=ON
 cmake --build build --parallel
 ```
+
+### Speech-to-text model
+
+The whisper.cpp bridge needs a ggml model file at run time (it is **not**
+bundled — the `tiny`/`base` models are ~75–148 MB). Download one with the
+script that whisper.cpp ships and point voicelab at it:
+
+```bash
+# from a whisper.cpp checkout:
+./models/download-ggml-model.sh base.en
+# -> models/ggml-base.en.bin
+```
+
+> The `models/` directory is git-ignored on purpose. **Do not commit the
+> `*.bin` weights** — they are large binaries and are obtained per the above.
 
 CMake options:
 
