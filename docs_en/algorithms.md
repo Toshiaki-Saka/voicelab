@@ -1,5 +1,8 @@
 # Algorithm notes
 
+> A Japanese translation is available at [`docs_ja/algorithms.md`](../docs_ja/algorithms.md).
+> This English version is authoritative if the two ever diverge.
+
 This document is the "why" behind the code in `src/core/`. It is written
 to be readable in isolation; references are given where the original
 derivations are clearer than what fits in code comments.

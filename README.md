@@ -88,6 +88,19 @@ CMake options:
 | `VOICELAB_WITH_WHISPER`         | OFF     | Pull in whisper.cpp for ASR             |
 | `VOICELAB_WARNINGS_AS_ERRORS`   | OFF     | `-Werror` / `/WX`                       |
 
+### One-command build + visualization (Windows)
+
+`build_and_visualize.ps1` is a convenience wrapper for Windows/PowerShell that
+configures and builds the project, generates a chirp WAV, runs the
+`01_sine_spectrum` and `04_mfcc_dump` examples, and opens a matplotlib GUI
+showing the waveform, spectrogram and MFCCs. It needs Python with `matplotlib`
+and `numpy` (installed automatically if missing).
+
+```powershell
+.\build_and_visualize.ps1                 # Release
+.\build_and_visualize.ps1 -BuildType Debug
+```
+
 ## Quick start
 
 Take a sine wave, run streaming STFT, print the peak bin:
@@ -125,7 +138,8 @@ src/                Implementation
 examples/           Standalone programs, each focusing on one concept
 tests/              Catch2 unit tests
 cmake/              Helper modules (warnings, deps via FetchContent)
-docs/               Design notes, algorithm derivations
+docs_en/            Design notes, algorithm derivations (English, authoritative)
+docs_ja/            Japanese translation of docs_en/
 ```
 
 ## Design notes

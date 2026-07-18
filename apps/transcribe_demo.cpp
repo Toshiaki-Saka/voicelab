@@ -254,7 +254,7 @@ void run_transcription(AppState& app) {
             app.model_path, pcm16k, "ja");
 
         std::lock_guard<std::mutex> lk(app.mu);
-        app.result_text = text.empty() ? "(認識結果なし)" : text;
+        app.result_text = text.empty() ? "(no transcription result)" : text;
         app.state.store(State::Done);
     } catch (const std::exception& e) {
         std::lock_guard<std::mutex> lk(app.mu);
@@ -353,7 +353,7 @@ int main(int argc, char** argv) {
         ImGui::Spacing();
 
         // ---- WAV file path + picker button --------------------------------
-        ImGui::TextUnformatted("音声ファイル:");
+        ImGui::TextUnformatted("Audio file:");
         ImGui::SameLine();
         float pick_btn_w = 90.0F;
         ImGui::SetNextItemWidth(
@@ -366,7 +366,7 @@ int main(int argc, char** argv) {
             app.state.store(State::Idle);
         }
         ImGui::SameLine();
-        if (ImGui::Button("ファイル選択", {pick_btn_w, 0})) {
+        if (ImGui::Button("Browse", {pick_btn_w, 0})) {
             if (open_wav_dialog(app.wav_path, sizeof(app.wav_path))) {
                 app.spec_dirty = true;
                 std::lock_guard<std::mutex> lk(app.mu);
@@ -377,19 +377,19 @@ int main(int argc, char** argv) {
         ImGui::Spacing();
 
         // ---- Model path ---------------------------------------------------
-        ImGui::TextUnformatted("モデルパス  :");
+        ImGui::TextUnformatted("Model path :");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-1.0F);
         ImGui::InputText("##model", app.model_path, sizeof(app.model_path));
         ImGui::TextDisabled(
-            "  ggml モデルDL先: https://huggingface.co/ggerganov/whisper.cpp");
+            "  ggml model download: https://huggingface.co/ggerganov/whisper.cpp");
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
 
         // ---- Transcribe button --------------------------------------------
         if (busy) ImGui::BeginDisabled();
-        const bool clicked = ImGui::Button("  文字起こし実行  ");
+        const bool clicked = ImGui::Button("  Transcribe  ");
         if (busy) ImGui::EndDisabled();
 
         // --autorun: start immediately on first frame
@@ -407,7 +407,7 @@ int main(int argc, char** argv) {
         if (busy) {
             ImGui::SameLine();
             static float anim = 0.0F; anim += io.DeltaTime;
-            const char* dots[] = {"処理中   ", "処理中.  ", "処理中.. ", "処理中..."};
+            const char* dots[] = {"Processing   ", "Processing.  ", "Processing.. ", "Processing..."};
             ImGui::TextUnformatted(dots[static_cast<int>(anim * 3.0F) % 4]);
         }
 
@@ -425,13 +425,13 @@ int main(int argc, char** argv) {
                                      60.0F);
 
         // ---- Transcription result -----------------------------------------
-        ImGui::TextUnformatted("認識結果:");
+        ImGui::TextUnformatted("Transcription:");
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.12F, 0.12F, 0.12F, 1.0F));
         ImGui::BeginChild("##result", ImVec2(-1.0F, res_h), true);
         {
             std::lock_guard<std::mutex> lk(app.mu);
             if (state == State::Error && !app.error_text.empty()) {
-                ImGui::TextColored({1.0F, 0.4F, 0.4F, 1.0F}, "エラー:");
+                ImGui::TextColored({1.0F, 0.4F, 0.4F, 1.0F}, "Error:");
                 ImGui::TextWrapped("%s", app.error_text.c_str());
             } else if (!app.result_text.empty()) {
                 ImGui::Spacing();
@@ -439,7 +439,7 @@ int main(int argc, char** argv) {
                 ImGui::TextWrapped("%s", app.result_text.c_str());
                 ImGui::SetWindowFontScale(1.0F);
             } else {
-                ImGui::TextDisabled("(ここに認識結果が表示されます)");
+                ImGui::TextDisabled("(the transcription result appears here)");
             }
         }
         ImGui::EndChild();
@@ -448,13 +448,13 @@ int main(int argc, char** argv) {
         ImGui::Spacing();
 
         // ---- Spectrogram -------------------------------------------------
-        ImGui::TextUnformatted("スペクトログラム:");
+        ImGui::TextUnformatted("Spectrogram:");
         ImGui::SameLine();
         if (app.spec.ready) {
-            ImGui::TextDisabled("  %d x %d  texID=%u  (低周波↓ 高周波↑)",
+            ImGui::TextDisabled("  %d x %d  texID=%u  (low freq down / high freq up)",
                                 app.spec.width, app.spec.height, app.spec.id);
         } else {
-            ImGui::TextDisabled("  (ファイル読込後に表示)");
+            ImGui::TextDisabled("  (shown after a file is loaded)");
         }
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.05F, 0.05F, 0.05F, 1.0F));
@@ -466,7 +466,7 @@ int main(int argc, char** argv) {
                     sz);
             } else {
                 ImGui::Spacing();
-                ImGui::TextDisabled("  スペクトログラムを計算中...");
+                ImGui::TextDisabled("  Computing spectrogram...");
             }
         }
         ImGui::EndChild();

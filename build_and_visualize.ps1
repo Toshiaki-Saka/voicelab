@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    voicelab — ビルド・シミュレーション・Python GUI 可視化スクリプト
+    voicelab — build / simulate / visualize (Python GUI) helper script.
 
 .DESCRIPTION
-    1. CMake でルートを Configure → Build
-    2. Python でチャープ WAV を生成
-    3. 01_sine_spectrum / 04_mfcc_dump を実行
-    4. matplotlib GUI でスペクトログラム・MFCC・波形を可視化
+    1. Configure and build the root project with CMake.
+    2. Generate a chirp WAV with Python.
+    3. Run 01_sine_spectrum / 04_mfcc_dump.
+    4. Visualize the spectrogram / MFCC / waveform in a matplotlib GUI.
 
 .PARAMETER BuildType
-    CMake ビルドタイプ (Release / Debug / RelWithDebInfo)。デフォルト: Release
+    CMake build type (Release / Debug / RelWithDebInfo). Default: Release.
 
 .EXAMPLE
     .\build_and_visualize.ps1
@@ -26,7 +26,7 @@ $Root  = $PSScriptRoot
 $Build = Join-Path $Root 'build'
 $Out   = Join-Path $Root 'simulation_output'
 
-# ── 0. 出力ディレクトリを準備 ────────────────────────────────────────────────
+# ── 0. Prepare the output directory ──────────────────────────────────────────
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 $WavPath  = Join-Path $Out 'chirp.wav'
 $CsvPath  = Join-Path $Out 'mfcc.csv'
@@ -39,7 +39,7 @@ $PyViz    = Join-Path $Out 'visualize.py'
 Write-Host ''
 Write-Host '[1/5] CMake Configure ...' -ForegroundColor Cyan
 cmake -S $Root -B $Build -DCMAKE_BUILD_TYPE=$BuildType
-if ($LASTEXITCODE -ne 0) { throw 'cmake configure に失敗しました。' }
+if ($LASTEXITCODE -ne 0) { throw 'cmake configure failed.' }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ── 2. Build ─────────────────────────────────────────────────────────────────
@@ -47,10 +47,10 @@ if ($LASTEXITCODE -ne 0) { throw 'cmake configure に失敗しました。' }
 Write-Host ''
 Write-Host '[2/5] Build ...' -ForegroundColor Cyan
 cmake --build $Build --config $BuildType --parallel
-if ($LASTEXITCODE -ne 0) { throw 'cmake build に失敗しました。' }
+if ($LASTEXITCODE -ne 0) { throw 'cmake build failed.' }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# helper: ビルド出力からexeを探す（MSVC/GCC どちらにも対応）
+# helper: locate an exe in the build output (handles both MSVC and GCC layouts)
 # ─────────────────────────────────────────────────────────────────────────────
 function Find-Exe([string]$Name) {
     $candidates = @(
@@ -66,7 +66,7 @@ function Find-Exe([string]$Name) {
     $hit = Get-ChildItem -Path $Build -Recurse -Filter "$Name.exe" -ErrorAction SilentlyContinue |
            Select-Object -First 1
     if ($hit) { return $hit.FullName }
-    throw "ビルド出力に $Name.exe が見つかりません: $Build"
+    throw "$Name.exe not found in build output: $Build"
 }
 
 $sineExe = Find-Exe '01_sine_spectrum'
@@ -75,10 +75,10 @@ Write-Host "  sine_spectrum : $sineExe" -ForegroundColor DarkGray
 Write-Host "  mfcc_dump     : $mfccExe" -ForegroundColor DarkGray
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ── 3. チャープ WAV 生成 (Python stdlib のみ) ─────────────────────────────────
+# ── 3. Generate the chirp WAV (Python stdlib only) ───────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[3/5] チャープ WAV を生成中 ...' -ForegroundColor Cyan
+Write-Host '[3/5] Generating chirp WAV ...' -ForegroundColor Cyan
 
 @'
 """Generate a linear-chirp WAV (220 Hz -> 3520 Hz, 3 s, 44100 Hz, mono PCM16)."""
@@ -109,33 +109,33 @@ if __name__ == '__main__':
 '@ | Set-Content -Path $PyGenWav -Encoding UTF8
 
 python $PyGenWav $WavPath
-if ($LASTEXITCODE -ne 0) { throw 'WAV 生成に失敗しました。' }
+if ($LASTEXITCODE -ne 0) { throw 'WAV generation failed.' }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ── 4. C++ シミュレーション ───────────────────────────────────────────────────
+# ── 4. C++ simulation ────────────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[4/5] C++ シミュレーション実行 ...' -ForegroundColor Cyan
+Write-Host '[4/5] Running C++ simulation ...' -ForegroundColor Cyan
 
-# 01_sine_spectrum: 引数不要、コンソール出力のみ
+# 01_sine_spectrum: no arguments, console output only
 Write-Host '  --- 01_sine_spectrum ---' -ForegroundColor Yellow
 & $sineExe
-if ($LASTEXITCODE -ne 0) { throw '01_sine_spectrum が失敗しました。' }
+if ($LASTEXITCODE -ne 0) { throw '01_sine_spectrum failed.' }
 
 # 04_mfcc_dump: WAV -> MFCC CSV
 Write-Host "  --- 04_mfcc_dump -> $CsvPath ---" -ForegroundColor Yellow
 & $mfccExe $WavPath 13 | Set-Content -Path $CsvPath -Encoding ASCII
-if ($LASTEXITCODE -ne 0) { throw '04_mfcc_dump が失敗しました。' }
-$rowCount = (Get-Content $CsvPath | Measure-Object -Line).Lines - 1   # ヘッダ除く
-Write-Host "  MFCC: $rowCount フレーム x 13 係数 -> $CsvPath" -ForegroundColor DarkGray
+if ($LASTEXITCODE -ne 0) { throw '04_mfcc_dump failed.' }
+$rowCount = (Get-Content $CsvPath | Measure-Object -Line).Lines - 1   # excluding the header
+Write-Host "  MFCC: $rowCount frames x 13 coefficients -> $CsvPath" -ForegroundColor DarkGray
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ── 5. Python GUI 可視化 ──────────────────────────────────────────────────────
+# ── 5. Python GUI visualization ──────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
 Write-Host ''
-Write-Host '[5/5] Python 依存ライブラリを確認中 ...' -ForegroundColor Cyan
+Write-Host '[5/5] Checking Python dependencies ...' -ForegroundColor Cyan
 
-# matplotlib / numpy がなければインストール
+# Install matplotlib / numpy if missing
 foreach ($pkg in @('matplotlib', 'numpy')) {
     $check = python -c "import $pkg" 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -144,7 +144,7 @@ foreach ($pkg in @('matplotlib', 'numpy')) {
     }
 }
 
-Write-Host 'Python GUI を起動します ...' -ForegroundColor Cyan
+Write-Host 'Launching the Python GUI ...' -ForegroundColor Cyan
 
 @'
 """voicelab simulation visualizer — matplotlib TkAgg GUI."""
@@ -160,7 +160,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 WAV_PATH = sys.argv[1]
 CSV_PATH = sys.argv[2]
 
-# ── データ読み込み ────────────────────────────────────────────────────────────
+# ── Load data ─────────────────────────────────────────────────────────────────
 with wave.open(WAV_PATH, 'r') as wf:
     SR       = wf.getframerate()
     n_frames = wf.getnframes()
@@ -169,20 +169,20 @@ with wave.open(WAV_PATH, 'r') as wf:
 with open(CSV_PATH, newline='') as f:
     rows = list(csv.DictReader(f))
 
-n_mfcc_coeff = len(rows[0]) - 1          # 'frame' 列を除く
+n_mfcc_coeff = len(rows[0]) - 1          # excluding the 'frame' column
 mfcc = np.array([
     [float(rows[i][f'mfcc{j}']) for j in range(n_mfcc_coeff)]
     for i in range(len(rows))
 ]).T  # shape: (n_mfcc_coeff, n_frames)
 
-# ── カラーテーマ ──────────────────────────────────────────────────────────────
+# ── Color theme ───────────────────────────────────────────────────────────────
 BG   = '#1e1e2e'
 BG2  = '#181825'
 FG   = '#cdd6f4'
 FG2  = '#a6adc8'
 EDGE = '#45475a'
 
-# ── Tk ウィンドウ ─────────────────────────────────────────────────────────────
+# ── Tk window ─────────────────────────────────────────────────────────────────
 root = tk.Tk()
 root.title('voicelab  —  Chirp Simulation Visualizer')
 root.configure(bg=BG)
@@ -210,7 +210,7 @@ def style_ax(ax, title):
     ax.yaxis.label.set_color(FG2)
     ax.yaxis.label.set_fontsize(8)
 
-# ── (row 0, full width) 波形 ─────────────────────────────────────────────────
+# ── (row 0, full width) Waveform ─────────────────────────────────────────────
 ax_wave = fig.add_subplot(gs[0, :])
 t = np.arange(len(samples)) / SR
 ax_wave.plot(t, samples, color='#89dceb', linewidth=0.35, alpha=0.9)
@@ -219,7 +219,7 @@ ax_wave.set_xlabel('Time (s)')
 ax_wave.set_ylabel('Amplitude')
 ax_wave.set_xlim(0, t[-1])
 
-# ── (row 1, full width) スペクトログラム ─────────────────────────────────────
+# ── (row 1, full width) Spectrogram ──────────────────────────────────────────
 ax_spec = fig.add_subplot(gs[1, :])
 _, _, _, im_spec = ax_spec.specgram(
     samples, NFFT=1024, Fs=SR, noverlap=768, cmap='inferno', scale='dB'
@@ -231,7 +231,7 @@ cb1 = fig.colorbar(im_spec, ax=ax_spec, pad=0.01)
 cb1.ax.tick_params(labelsize=7, colors=FG2)
 cb1.ax.yaxis.label.set_color(FG2)
 
-# ── (row 2, left) MFCC ヒートマップ ──────────────────────────────────────────
+# ── (row 2, left) MFCC heatmap ───────────────────────────────────────────────
 ax_heat = fig.add_subplot(gs[2, 0])
 im_heat = ax_heat.imshow(
     mfcc, aspect='auto', origin='lower', cmap='coolwarm',
@@ -243,7 +243,7 @@ ax_heat.set_ylabel('MFCC index')
 cb2 = fig.colorbar(im_heat, ax=ax_heat, pad=0.01)
 cb2.ax.tick_params(labelsize=7, colors=FG2)
 
-# ── (row 2, right) MFCC 係数ごとの mean ± std ────────────────────────────────
+# ── (row 2, right) MFCC mean ± std per coefficient ───────────────────────────
 ax_bar = fig.add_subplot(gs[2, 1])
 means = mfcc.mean(axis=1)
 stds  = mfcc.std(axis=1)
@@ -259,7 +259,7 @@ ax_bar.set_ylabel('Value')
 leg = ax_bar.legend(fontsize=7, facecolor='#313244',
                      labelcolor=FG, edgecolor=EDGE)
 
-# ── Canvas を Tk に埋め込む ───────────────────────────────────────────────────
+# ── Embed the canvas in Tk ────────────────────────────────────────────────────
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.draw()
 canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -281,7 +281,7 @@ sys.exit(0)
 '@ | Set-Content -Path $PyViz -Encoding UTF8
 
 python $PyViz $WavPath $CsvPath
-if ($LASTEXITCODE -ne 0) { throw 'Python GUI が異常終了しました。' }
+if ($LASTEXITCODE -ne 0) { throw 'Python GUI exited abnormally.' }
 
 Write-Host ''
-Write-Host '完了。' -ForegroundColor Green
+Write-Host 'Done.' -ForegroundColor Green

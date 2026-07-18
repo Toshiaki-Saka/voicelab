@@ -11,7 +11,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 WAV_PATH = sys.argv[1]
 CSV_PATH = sys.argv[2]
 
-# ── データ読み込み ────────────────────────────────────────────────────────────
+# ── Load data ─────────────────────────────────────────────────────────────────
 with wave.open(WAV_PATH, 'r') as wf:
     SR       = wf.getframerate()
     n_frames = wf.getnframes()
@@ -20,20 +20,20 @@ with wave.open(WAV_PATH, 'r') as wf:
 with open(CSV_PATH, newline='') as f:
     rows = list(csv.DictReader(f))
 
-n_mfcc_coeff = len(rows[0]) - 1          # 'frame' 列を除く
+n_mfcc_coeff = len(rows[0]) - 1          # excluding the 'frame' column
 mfcc = np.array([
     [float(rows[i][f'mfcc{j}']) for j in range(n_mfcc_coeff)]
     for i in range(len(rows))
 ]).T  # shape: (n_mfcc_coeff, n_frames)
 
-# ── カラーテーマ ──────────────────────────────────────────────────────────────
+# ── Color theme ───────────────────────────────────────────────────────────────
 BG   = '#1e1e2e'
 BG2  = '#181825'
 FG   = '#cdd6f4'
 FG2  = '#a6adc8'
 EDGE = '#45475a'
 
-# ── Tk ウィンドウ ─────────────────────────────────────────────────────────────
+# ── Tk window ─────────────────────────────────────────────────────────────────
 root = tk.Tk()
 root.title('voicelab  —  Chirp Simulation Visualizer')
 root.configure(bg=BG)
@@ -61,7 +61,7 @@ def style_ax(ax, title):
     ax.yaxis.label.set_color(FG2)
     ax.yaxis.label.set_fontsize(8)
 
-# ── (row 0, full width) 波形 ─────────────────────────────────────────────────
+# ── (row 0, full width) Waveform ─────────────────────────────────────────────
 ax_wave = fig.add_subplot(gs[0, :])
 t = np.arange(len(samples)) / SR
 ax_wave.plot(t, samples, color='#89dceb', linewidth=0.35, alpha=0.9)
@@ -70,7 +70,7 @@ ax_wave.set_xlabel('Time (s)')
 ax_wave.set_ylabel('Amplitude')
 ax_wave.set_xlim(0, t[-1])
 
-# ── (row 1, full width) スペクトログラム ─────────────────────────────────────
+# ── (row 1, full width) Spectrogram ──────────────────────────────────────────
 ax_spec = fig.add_subplot(gs[1, :])
 _, _, _, im_spec = ax_spec.specgram(
     samples, NFFT=1024, Fs=SR, noverlap=768, cmap='inferno', scale='dB'
@@ -82,7 +82,7 @@ cb1 = fig.colorbar(im_spec, ax=ax_spec, pad=0.01)
 cb1.ax.tick_params(labelsize=7, colors=FG2)
 cb1.ax.yaxis.label.set_color(FG2)
 
-# ── (row 2, left) MFCC ヒートマップ ──────────────────────────────────────────
+# ── (row 2, left) MFCC heatmap ───────────────────────────────────────────────
 ax_heat = fig.add_subplot(gs[2, 0])
 im_heat = ax_heat.imshow(
     mfcc, aspect='auto', origin='lower', cmap='coolwarm',
@@ -94,7 +94,7 @@ ax_heat.set_ylabel('MFCC index')
 cb2 = fig.colorbar(im_heat, ax=ax_heat, pad=0.01)
 cb2.ax.tick_params(labelsize=7, colors=FG2)
 
-# ── (row 2, right) MFCC 係数ごとの mean ± std ────────────────────────────────
+# ── (row 2, right) MFCC mean ± std per coefficient ───────────────────────────
 ax_bar = fig.add_subplot(gs[2, 1])
 means = mfcc.mean(axis=1)
 stds  = mfcc.std(axis=1)
@@ -110,7 +110,7 @@ ax_bar.set_ylabel('Value')
 leg = ax_bar.legend(fontsize=7, facecolor='#313244',
                      labelcolor=FG, edgecolor=EDGE)
 
-# ── Canvas を Tk に埋め込む ───────────────────────────────────────────────────
+# ── Embed the canvas in Tk ────────────────────────────────────────────────────
 canvas = FigureCanvasTkAgg(fig, master=root)
 canvas.draw()
 canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)

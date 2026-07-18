@@ -114,15 +114,15 @@ class TranscribeWorker(QThread):
         try:
             import whisper
             if not Path(self.wav_path).exists():
-                raise FileNotFoundError(f"ファイルが見つかりません: {self.wav_path}")
-            self.status.emit(f"モデル読込中 ({self.model_name})…")
+                raise FileNotFoundError(f"File not found: {self.wav_path}")
+            self.status.emit(f"Loading model ({self.model_name})…")
             model = whisper.load_model(self.model_name)
-            self.status.emit("音声解析中…")
+            self.status.emit("Analyzing audio…")
             samples, sr, channels = load_wav_float(self.wav_path)
             pcm16k = resample_to_16k(to_mono(samples, channels), sr)
-            self.status.emit("文字起こし中…")
+            self.status.emit("Transcribing…")
             result = model.transcribe(pcm16k, language="ja", fp16=False)
-            self.finished.emit(result.get("text", "").strip() or "(認識結果なし)")
+            self.finished.emit(result.get("text", "").strip() or "(no transcription result)")
         except Exception as exc:
             self.error.emit(str(exc))
 
@@ -166,7 +166,7 @@ class AnalysisCanvas(FigureCanvas):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._placeholder()
 
-    def _placeholder(self, msg="(ファイル読込後に表示)"):
+    def _placeholder(self, msg="(shown after a file is loaded)"):
         for ax, title in (
             (self.ax_wave, "Waveform"),
             (self.ax_spec, "Spectrogram"),
@@ -237,7 +237,7 @@ class AnalysisCanvas(FigureCanvas):
         self.draw_idle()
 
     def show_error(self, msg: str):
-        self._placeholder(f"エラー: {msg}")
+        self._placeholder(f"Error: {msg}")
 
 
 # ── Main window ───────────────────────────────────────────────────────────────
@@ -270,11 +270,11 @@ class MainWindow(QMainWindow):
 
         # WAV picker
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("音声ファイル:"))
+        row1.addWidget(QLabel("Audio file:"))
         self._wav = QLineEdit("simulation_output/my_voice.wav")
         self._wav.returnPressed.connect(self._reload)
         row1.addWidget(self._wav)
-        btn_pick = QPushButton("ファイル選択")
+        btn_pick = QPushButton("Browse")
         btn_pick.setFixedWidth(90)
         btn_pick.clicked.connect(self._pick)
         row1.addWidget(btn_pick)
@@ -282,7 +282,7 @@ class MainWindow(QMainWindow):
 
         # Model selector
         row2 = QHBoxLayout()
-        row2.addWidget(QLabel("Whisper モデル:"))
+        row2.addWidget(QLabel("Whisper model:"))
         self._model = QComboBox()
         self._model.addItems(["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"])
         self._model.setCurrentText("base")
@@ -293,7 +293,7 @@ class MainWindow(QMainWindow):
 
         # Run button + status
         row3 = QHBoxLayout()
-        self._btn = QPushButton("  文字起こし実行  ")
+        self._btn = QPushButton("  Transcribe  ")
         self._btn.setStyleSheet("font-size:14px; padding:6px 16px;")
         self._btn.clicked.connect(self._run)
         row3.addWidget(self._btn)
@@ -305,12 +305,12 @@ class MainWindow(QMainWindow):
         vbox.addWidget(_hline())
 
         # Transcription result
-        vbox.addWidget(QLabel("認識結果:"))
+        vbox.addWidget(QLabel("Transcription:"))
         self._result = QTextEdit()
         self._result.setReadOnly(True)
         self._result.setFixedHeight(80)
         self._result.setStyleSheet(_RESULT_STYLE)
-        self._result.setPlaceholderText("(ここに認識結果が表示されます)")
+        self._result.setPlaceholderText("(the transcription result appears here)")
         vbox.addWidget(self._result)
 
         # 4-panel analysis canvas
@@ -321,7 +321,7 @@ class MainWindow(QMainWindow):
 
     def _pick(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "WAVファイルを選択", "",
+            self, "Select a WAV file", "",
             "WAV Files (*.wav);;All Files (*.*)")
         if path:
             self._wav.setText(path)
@@ -334,7 +334,7 @@ class MainWindow(QMainWindow):
     def _refresh_canvas(self):
         path = self._wav.text().strip()
         if not Path(path).exists():
-            self._canvas.show_error("ファイルが見つかりません")
+            self._canvas.show_error("File not found")
             return
         try:
             mono, sr, mag_db, freqs, times, mfcc = compute_analysis(path)
@@ -350,7 +350,7 @@ class MainWindow(QMainWindow):
         self._result.clear()
         self._result.setStyleSheet(_RESULT_STYLE)
         self._btn.setEnabled(False)
-        self._status.setText("処理中...")
+        self._status.setText("Processing...")
         self._refresh_canvas()
 
         self._worker = TranscribeWorker(path, model)
@@ -368,7 +368,7 @@ class MainWindow(QMainWindow):
 
     def _on_error(self, msg: str):
         self._result.setStyleSheet(_ERROR_STYLE)
-        self._result.setPlainText(f"エラー:\n{msg}")
+        self._result.setPlainText(f"Error:\n{msg}")
         self._btn.setEnabled(True)
         self._status.setText("")
 
