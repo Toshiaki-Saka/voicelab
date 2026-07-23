@@ -156,12 +156,12 @@ spectra in and pull samples out at whatever block size your sink wants.
 **Dependencies.** pocketfft (BSD-3) is the only required dependency, vendored
 via `FetchContent`. RtAudio and whisper.cpp are pulled in only when their
 features are turned on, and have permissive licenses (MIT) that compose
-cleanly with this library's MIT license.
+cleanly with this library's Apache-2.0 license.
 
 **Portability.** CI builds on Linux, macOS and Windows. No POSIX-specific
 calls leak into the public API.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). Third-party dependencies retain their own
+Apache-2.0. See [LICENSE](LICENSE). Third-party dependencies retain their own
 licenses; review them before redistribution.
