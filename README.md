@@ -83,7 +83,7 @@ CMake options:
 |---------------------------------|---------|-----------------------------------------|
 | `VOICELAB_BUILD_EXAMPLES`       | ON      | Build the `examples/` programs          |
 | `VOICELAB_BUILD_TESTS`          | ON      | Build Catch2-based unit tests           |
-| `VOICELAB_BUILD_APPS`           | OFF     | Build the GUI demo (placeholder)        |
+| `VOICELAB_BUILD_APPS`           | OFF     | Build the ImGui desktop demo (needs Dear ImGui + GLFW) |
 | `VOICELAB_WITH_RTAUDIO`         | OFF     | Pull in RtAudio for live I/O            |
 | `VOICELAB_WITH_WHISPER`         | OFF     | Pull in whisper.cpp for ASR             |
 | `VOICELAB_WARNINGS_AS_ERRORS`   | OFF     | `-Werror` / `/WX`                       |
@@ -99,6 +99,34 @@ and `numpy` (installed automatically if missing).
 ```powershell
 .\build_and_visualize.ps1                 # Release
 .\build_and_visualize.ps1 -BuildType Debug
+```
+
+### Python GUI (`apps/transcribe_demo.py`)
+
+A PyQt6 front-end: pick a WAV, see its waveform, spectrogram and MFCCs, and
+transcribe it with Whisper.
+
+**It computes no DSP of its own.** The STFT, the mel filterbank and the DCT all
+run in the C++ core through the `05_analyze_wav` example, which prints the
+spectrogram and MFCC matrices as text; the GUI parses them and draws. Build the
+examples first, or the analysis panel will tell you what to run:
+
+```bash
+cmake -S . -B build && cmake --build build --config Release
+pip install PyQt6 numpy matplotlib scipy openai-whisper
+python apps/transcribe_demo.py
+```
+
+Set `VOICELAB_ANALYZER` to point at the executable if it lives outside the usual
+`build/examples/` layout. `scipy` is still needed, but only for `resample_poly`
+when handing audio to Whisper at 16 kHz — none of the spectral analysis is
+duplicated in Python.
+
+`05_analyze_wav` is a normal CLI, so it is also the easiest way to get the
+numbers into any other tool:
+
+```bash
+./build/examples/05_analyze_wav simulation_output/chirp.wav 13 40 8000 > analysis.txt
 ```
 
 ## Quick start

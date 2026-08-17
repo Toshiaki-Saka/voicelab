@@ -2,18 +2,25 @@
 apps/transcribe_demo.py
 
 Python GUI: file picker → waveform + spectrogram + MFCC → Whisper transcription → WAV playback
+The spectral analysis is NOT computed here: the STFT, mel filterbank and DCT run
+in the C++ core via the `05_analyze_wav` example, which this GUI runs and parses.
+Build it with `cmake --build build --config Release` (or set VOICELAB_ANALYZER).
+scipy is used only for resample_poly on the way to Whisper.
+
 Requirements: pip install PyQt6 openai-whisper scipy numpy matplotlib
 Run:          python apps/transcribe_demo.py [--autorun]
 """
 
+import os
+import shutil
+import subprocess
 import sys
 import wave as wav_mod
 from math import gcd
 from pathlib import Path
 
 import numpy as np
-from scipy.signal import stft as scipy_stft, resample_poly
-from scipy.fftpack import dct as scipy_dct
+from scipy.signal import resample_poly
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -63,39 +70,119 @@ def resample_to_16k(mono: np.ndarray, sr: int) -> np.ndarray:
 
 # ── Analysis (spectrogram + MFCC) ────────────────────────────────────────────
 
+ANALYZER = "05_analyze_wav"
+
+
+def find_analyzer() -> str:
+    """Locate the 05_analyze_wav executable built from examples/.
+
+    Set VOICELAB_ANALYZER to override; otherwise the usual single- and
+    multi-config build layouts are searched, then PATH.
+    """
+    override = os.environ.get("VOICELAB_ANALYZER")
+    if override:
+        if Path(override).is_file():
+            return override
+        raise FileNotFoundError(
+            f"VOICELAB_ANALYZER points at {override}, which does not exist")
+
+    root = Path(__file__).resolve().parent.parent
+    exe = ANALYZER + (".exe" if os.name == "nt" else "")
+    candidates = [
+        root / "build" / "examples" / exe,
+        root / "build" / "examples" / "Release" / exe,
+        root / "build" / "examples" / "Debug" / exe,
+        root / "build" / exe,
+        root / "build" / "Release" / exe,
+    ]
+    for c in candidates:
+        if c.is_file():
+            return str(c)
+
+    found = shutil.which(ANALYZER)
+    if found:
+        return found
+
+    raise FileNotFoundError(
+        f"{ANALYZER} not found. Build it first:\n"
+        f"    cmake -S . -B build && cmake --build build --config Release\n"
+        f"or point VOICELAB_ANALYZER at the executable.")
+
+
+def _parse_analysis(text: str):
+    """Parse the 05_analyze_wav stream into (meta, freqs, times, mag_db, mfcc)."""
+    meta: dict[str, int] = {}
+    freqs = times = None
+    mag_rows: list[list[float]] = []
+    mfcc_rows: list[list[float]] = []
+    section = None
+
+    def row(line: str) -> list[float]:
+        return [float(v) for v in line.split(",")]
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("["):
+            section = line
+            continue
+        if section is None:
+            key, _, value = line.partition(",")
+            meta[key] = int(value)
+        elif section == "[freqs]":
+            freqs = row(line)
+        elif section == "[times]":
+            times = row(line)
+        elif section == "[mag_db]":
+            mag_rows.append(row(line))
+        elif section == "[mfcc]":
+            mfcc_rows.append(row(line))
+
+    for key in ("sample_rate", "num_frames", "num_bins", "mfcc_count"):
+        if key not in meta:
+            raise ValueError(f"{ANALYZER} output is missing '{key}'")
+    if freqs is None or times is None:
+        raise ValueError(f"{ANALYZER} output is missing the freqs/times axes")
+    if len(mag_rows) != meta["num_frames"] or len(mfcc_rows) != meta["num_frames"]:
+        raise ValueError(
+            f"{ANALYZER} announced {meta['num_frames']} frames but emitted "
+            f"{len(mag_rows)} spectrogram and {len(mfcc_rows)} MFCC rows")
+
+    # The tool emits one row per frame; the plots want [bin, frame] / [coef, frame].
+    return (meta,
+            np.asarray(freqs, dtype=float),
+            np.asarray(times, dtype=float),
+            np.asarray(mag_rows, dtype=float).T,
+            np.asarray(mfcc_rows, dtype=float).T)
+
+
 def compute_analysis(wav_path: str, n_mfcc: int = 13, n_mels: int = 40):
-    """Return (mono, sr, mag_db, freqs_hz, times_s, mfcc [n_mfcc × n_frames])."""
+    """Return (mono, sr, mag_db, freqs_hz, times_s, mfcc [n_mfcc × n_frames]).
+
+    The STFT, mel filterbank and DCT all run in the C++ core via the
+    ``05_analyze_wav`` example; this function only reads the numbers back and
+    reshapes them for matplotlib. Recomputing any of it in scipy here would
+    fork the DSP, which is exactly what voicelab exists to provide.
+    """
+    # The waveform panel and the Whisper hand-off need the samples themselves.
+    # That is plain file I/O, not signal processing, so it stays in Python.
     samples, sr, channels = load_wav_float(wav_path)
     mono = to_mono(samples, channels)
 
-    N, HOP = 1024, 256
-    freqs, times, Zxx = scipy_stft(mono, fs=sr, nperseg=N, noverlap=N - HOP,
-                                    window="hann")
-    power = np.abs(Zxx) ** 2
+    proc = subprocess.run(
+        [find_analyzer(), wav_path, str(n_mfcc), str(n_mels), "8000"],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"{ANALYZER} failed ({proc.returncode}): {proc.stderr.strip()}")
 
-    # Spectrogram limited to 8 kHz
-    mask   = freqs <= 8_000.0
-    mag_db = 20.0 * np.log10(np.sqrt(power[mask]) + 1e-8)
+    meta, freqs, times, mag_db, mfcc = _parse_analysis(proc.stdout)
+    if meta["sample_rate"] != sr:
+        raise RuntimeError(
+            f"{ANALYZER} read {meta['sample_rate']} Hz but Python read {sr} Hz")
 
-    # Mel filterbank
-    fmin, fmax = 0.0, float(sr) / 2.0
-    mel_pts = np.linspace(2595.0 * np.log10(1.0 + fmin / 700.0),
-                          2595.0 * np.log10(1.0 + fmax / 700.0),
-                          n_mels + 2)
-    hz_pts  = 700.0 * (10.0 ** (mel_pts / 2595.0) - 1.0)
-    bins    = np.clip(np.floor((N + 1) * hz_pts / sr).astype(int), 0, N // 2)
-
-    fb = np.zeros((n_mels, N // 2 + 1))
-    for m in range(1, n_mels + 1):
-        fs, fc, fe = bins[m - 1], bins[m], bins[m + 1]
-        if fc > fs:
-            fb[m - 1, fs:fc] = (np.arange(fs, fc) - fs) / (fc - fs)
-        if fe > fc:
-            fb[m - 1, fc:fe] = (fe - np.arange(fc, fe)) / (fe - fc)
-
-    mfcc = scipy_dct(np.log(fb @ power + 1e-8), type=2, axis=0, norm="ortho")[:n_mfcc]
-
-    return mono, sr, mag_db, freqs[mask], times, mfcc
+    return mono, sr, mag_db, freqs, times, mfcc
 
 
 # ── Background worker ─────────────────────────────────────────────────────────
