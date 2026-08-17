@@ -11,7 +11,11 @@
 
 using namespace voicelab::core;
 
-TEST_CASE("STFT → ISTFT round-trip reconstructs sine wave (modulo "
+// ASCII "->" on purpose: catch_discover_tests registers this string with ctest
+// and then passes it back as a filter, so a non-ASCII test name only survives if
+// every hop (compiler, console, ctest) agrees on the encoding. /utf-8 makes that
+// true for MSVC, but there is no reason to depend on it for a test name.
+TEST_CASE("STFT -> ISTFT round-trip reconstructs sine wave (modulo "
           "boundary)", "[istft]") {
     constexpr std::uint32_t sr = 16000;
     constexpr std::size_t   N  = 1024;
